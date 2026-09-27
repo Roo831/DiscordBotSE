@@ -56,15 +56,18 @@ public class DiscordBotConfiguration extends ListenerAdapter {
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         event.deferReply().queue();
 
-        String nickname = event.getOption("nickname").getAsString();
+
         String report;
 
         try {
             if (event.getName().equals("stats_week")) {
+                String nickname = event.getOption("nickname").getAsString();
                 report = backendAnalyticsService.getPlayerReport(nickname, 7);
             } else if (event.getName().equals("stats_month")) {
+                String nickname = event.getOption("nickname").getAsString();
                 report = backendAnalyticsService.getPlayerReport(nickname, 30);
             } else if (event.getName().equals("raw_data")) {
+                String nickname = event.getOption("nickname").getAsString();
                 OptionMapping daysOption = event.getOption("days");
                 int days = (daysOption != null) ? daysOption.getAsInt() : 3;
                 report = backendAnalyticsService.getRawDataReport(nickname, days);
