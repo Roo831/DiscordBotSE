@@ -10,7 +10,6 @@ public class BackendAnalyticsService {
 
     private final RestClient restClient;
 
-    // Инициализируем RestClient с базовым URL и заголовком авторизации
     public BackendAnalyticsService(
             @Value("${backend.api.url}") String baseUrl,
             @Value("${backend.api.key}") String apiKey) {
@@ -19,6 +18,18 @@ public class BackendAnalyticsService {
                 .baseUrl(baseUrl)
                 .defaultHeader("X-API-KEY", apiKey)
                 .build();
+    }
+
+    public String getNicknames(int days) {
+        try {
+           return restClient.get().uri(uriBuilder -> uriBuilder.path("/nicknames")
+                            .queryParam("days", days)
+                            .build())
+                    .retrieve()
+                    .body(String.class);
+        } catch (RestClientException e) {
+            return "Ошибка соединения с сервером аналитики. Попробуйте позже.";
+        }
     }
 
     public String getPlayerReport(String nickname, int days) {
