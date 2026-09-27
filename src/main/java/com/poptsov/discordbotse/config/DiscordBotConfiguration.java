@@ -44,7 +44,9 @@ public class DiscordBotConfiguration extends ListenerAdapter {
                         .addOption(OptionType.STRING, "nickname", "Никнейм игрока в Steam", true),
                 Commands.slash("raw_data", "Получить сырые записи лога по игроку")
                         .addOption(OptionType.STRING, "nickname", "Никнейм игрока в Steam", true)
-                        .addOption(OptionType.INTEGER, "days", "За сколько дней собрать логи (по умолчанию 3)", false)
+                        .addOption(OptionType.INTEGER, "days", "За сколько дней собрать логи (по умолчанию 3)", false),
+                Commands.slash("nicknames", "Получить никнеймы активных игроков за указанный промежуток времени")
+                        .addOption(OptionType.INTEGER, "days", "За сколько дней собрать никнеймы (по умолчанию 7)", false)
         ).queue();
 
         System.out.println("[DISCORD INFO] Бот успешно запущен и зарегистрировал слэш-команды!");
@@ -66,6 +68,10 @@ public class DiscordBotConfiguration extends ListenerAdapter {
                 OptionMapping daysOption = event.getOption("days");
                 int days = (daysOption != null) ? daysOption.getAsInt() : 3;
                 report = backendAnalyticsService.getRawDataReport(nickname, days);
+            } else if (event.getName().equals("nicknames")) {
+                OptionMapping daysOption = event.getOption("days");
+                int days = (daysOption != null) ? daysOption.getAsInt() : 7;
+                report = backendAnalyticsService.getNicknames(days);
             } else {
                 return;
             }
