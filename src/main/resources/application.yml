@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: DiscordBotService
+
+discord:
+  bot:
+    token: ${DISCORD_API_KEY}
+
+backend:
+  api:
+    url: http://${SERVER_IP}:8083/api/v1/analytics
+    key: ${SERVER_API_KEY}

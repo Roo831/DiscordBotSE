@@ -1,0 +1,9 @@
+services:
+  discord-bot:
+    build: .
+    container_name: discord-bot-se
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./bot_logs:/app/logs
