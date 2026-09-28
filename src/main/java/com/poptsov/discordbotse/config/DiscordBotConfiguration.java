@@ -45,8 +45,8 @@ public class DiscordBotConfiguration extends ListenerAdapter {
                 Commands.slash("raw_data", "Получить сырые записи лога по игроку")
                         .addOption(OptionType.STRING, "nickname", "Никнейм игрока в Steam", true)
                         .addOption(OptionType.INTEGER, "days", "За сколько дней собрать логи (по умолчанию 3)", false),
-                Commands.slash("nicknames", "Получить никнеймы активных игроков за указанный промежуток времени")
-                        .addOption(OptionType.INTEGER, "days", "За сколько дней собрать никнеймы (по умолчанию 7)", false)
+                Commands.slash("all_nicknames", "Получить все никнеймы активных игроков за указанный промежуток времени")
+                        .addOption(OptionType.INTEGER, "days", "За сколько дней собрать никнеймы (по умолчанию 7)", true)
         ).queue();
 
         System.out.println("[DISCORD INFO] Бот успешно запущен и зарегистрировал слэш-команды!");
@@ -55,8 +55,6 @@ public class DiscordBotConfiguration extends ListenerAdapter {
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         event.deferReply().queue();
-
-
         String report;
 
         try {
