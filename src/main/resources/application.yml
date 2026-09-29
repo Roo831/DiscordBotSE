@@ -8,5 +8,5 @@ discord:
 
 backend:
   api:
-    url: http://${SERVER_IP}:8083/api/v1/analytics
+    url: http://${SERVER_IP}:8083/api/v1/analytics/engineers
     key: ${SERVER_API_KEY}

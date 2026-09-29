@@ -69,7 +69,7 @@ public class DiscordBotConfiguration extends ListenerAdapter {
                 OptionMapping daysOption = event.getOption("days");
                 int days = (daysOption != null) ? daysOption.getAsInt() : 3;
                 report = backendAnalyticsService.getRawDataReport(nickname, days);
-            } else if (event.getName().equals("nicknames")) {
+            } else if (event.getName().equals("all_nicknames")) {
                 OptionMapping daysOption = event.getOption("days");
                 int days = (daysOption != null) ? daysOption.getAsInt() : 7;
                 report = backendAnalyticsService.getNicknames(days);
