@@ -43,13 +43,13 @@ public class DiscordBot extends ListenerAdapter {
         jda.updateCommands().addCommands(
                 Commands.slash(prefixSlashCommand + "_stats_week", "Get player analytics for the week")
                         .addOption(OptionType.STRING, "nickname", "Player's Steam nickname", true),
-                Commands.slash(prefixSlashCommand  +"_stats_month", "Get player analytics for the month")
+                Commands.slash(prefixSlashCommand + "_stats_month", "Get player analytics for the month")
                         .addOption(OptionType.STRING, "nickname", "Player's Steam nickname", true),
                 Commands.slash(prefixSlashCommand + "_raw_data", "Retrieve raw log entries for a player")
                         .addOption(OptionType.STRING, "nickname", "Player's Steam nickname", true)
                         .addOption(OptionType.INTEGER, "days", "Number of days of logs to collect (default: 3)", false),
                 Commands.slash(prefixSlashCommand + "_all_nicknames", "Retrieve the nicknames of all active players for the specified time period.")
-                        .addOption(OptionType.INTEGER, "days", "How many days to collect nicknames (default: 7)", true)
+                        .addOption(OptionType.INTEGER, "days", "How many days to collect nicknames (default: 7)", false)
         ).queue();
 
         System.out.println("[" + serverName + "]: Бот успешно запущен и зарегистрировал слэш-команды!");
@@ -57,7 +57,13 @@ public class DiscordBot extends ListenerAdapter {
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        event.deferReply().queue();
+        try {
+            event.deferReply().complete();
+        } catch (Exception e) {
+            System.err.println("[" + serverName + "]: Не удалось подтвердить взаимодействие (возможно, оно уже истекло).");
+            return;
+        }
+
         String report;
 
         try {
@@ -80,27 +86,53 @@ public class DiscordBot extends ListenerAdapter {
                 return;
             }
 
-            int maxLength = 1900;
+            int maxLength = 1800;
+
             if (report == null || report.trim().isEmpty()) {
-                event.getHook().editOriginal("Data not found").queue();
+                event.getHook().editOriginal("Data not found").complete();
             } else if (report.length() <= maxLength) {
-                event.getHook().editOriginal(report).queue();
+                event.getHook().editOriginal(report).complete();
             } else {
-                event.getHook().editOriginal(report.substring(0, maxLength) + "\n*(continued below...)*").queue();
+                String[] lines = report.split("\n");
+                StringBuilder currentChunk = new StringBuilder();
+                boolean isFirstChunk = true;
 
-                for (int i = maxLength; i < report.length(); i += maxLength) {
-                    int endIndex = Math.min(i + maxLength, report.length());
-                    String chunk = report.substring(i, endIndex);
+                for (String line : lines) {
+                    if (currentChunk.length() + line.length() + 1 > maxLength) {
+                        if (isFirstChunk) {
+                            event.getHook().editOriginal(currentChunk.toString() + "\n*(continued below...)*").complete();
+                            isFirstChunk = false;
+                        } else {
+                            event.getHook().sendMessage("```text\n" + currentChunk.toString() + "```").complete();
+                        }
 
-                    try { Thread.sleep(500); } catch (InterruptedException e) {}
-                    event.getHook().sendMessage("```text\n" + chunk + "\n```").queue();
+                        currentChunk.setLength(0);
+
+                        try {
+                            Thread.sleep(600);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                    currentChunk.append(line).append("\n");
+                }
+
+                if (currentChunk.length() > 0) {
+                    if (isFirstChunk) {
+                        event.getHook().editOriginal(currentChunk.toString()).complete();
+                    } else {
+                        event.getHook().sendMessage("```text\n" + currentChunk.toString() + "```").complete();
+                    }
                 }
             }
-
         } catch (Exception e) {
             System.err.println("[" + serverName + "]: Ошибка при обработке команды: " + e.getMessage());
             e.printStackTrace();
-            event.getHook().editOriginal("Произошла внутренняя ошибка при обработке запроса.").queue();
+
+            try {
+                event.getHook().editOriginal("Произошла внутренняя ошибка при обработке запроса.").complete();
+            } catch (Exception ignored) {
+            }
         }
     }
 }
