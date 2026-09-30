@@ -61,18 +61,18 @@ public class DiscordBot extends ListenerAdapter {
         String report;
 
         try {
-            if (event.getName().equals("stats_week")) {
+            if (event.getName().equals(prefixSlashCommand + "_stats_week")) {
                 String nickname = event.getOption("nickname").getAsString();
                 report = backendAnalyticsService.getPlayerReport(nickname, 7);
-            } else if (event.getName().equals("stats_month")) {
+            } else if (event.getName().equals(prefixSlashCommand + "_stats_month")) {
                 String nickname = event.getOption("nickname").getAsString();
                 report = backendAnalyticsService.getPlayerReport(nickname, 30);
-            } else if (event.getName().equals("raw_data")) {
+            } else if (event.getName().equals(prefixSlashCommand + "_raw_data")) {
                 String nickname = event.getOption("nickname").getAsString();
                 OptionMapping daysOption = event.getOption("days");
                 int days = (daysOption != null) ? daysOption.getAsInt() : 3;
                 report = backendAnalyticsService.getRawDataReport(nickname, days);
-            } else if (event.getName().equals("all_nicknames")) {
+            } else if (event.getName().equals(prefixSlashCommand + "_all_nicknames")) {
                 OptionMapping daysOption = event.getOption("days");
                 int days = (daysOption != null) ? daysOption.getAsInt() : 7;
                 report = backendAnalyticsService.getNicknames(days);

@@ -22,7 +22,7 @@ public class BackendAnalyticsService {
                     .retrieve()
                     .body(String.class);
         } catch (RestClientException e) {
-            return "Error connecting to the analytics server. Please try again later..";
+            return "Error connecting to the analytics server. Please try again later.";
         }
     }
 
