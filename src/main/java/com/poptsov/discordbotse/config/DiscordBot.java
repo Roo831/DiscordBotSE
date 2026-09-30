@@ -1,7 +1,7 @@
 package com.poptsov.discordbotse.config;
 
-
 import com.poptsov.discordbotse.service.BackendAnalyticsService;
+import jakarta.annotation.PostConstruct;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -9,26 +9,26 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Configuration;
-import jakarta.annotation.PostConstruct;
 
-@Configuration
-public class DiscordBotConfiguration extends ListenerAdapter {
 
-    @Value("${discord.bot.token}")
+public class DiscordBot extends ListenerAdapter {
+
     private String botToken;
+
+    private String serverName;
 
     private final BackendAnalyticsService backendAnalyticsService;
 
-    public DiscordBotConfiguration(BackendAnalyticsService backendAnalyticsService) {
+    public DiscordBot(String botToken, String serverName, BackendAnalyticsService backendAnalyticsService) {
+        this.botToken = botToken;
+        this.serverName = serverName;
         this.backendAnalyticsService = backendAnalyticsService;
     }
 
     @PostConstruct
     public void startBot() throws Exception {
         if (botToken == null || botToken.trim().isEmpty() || botToken.equals("NOT_SET")) {
-            System.err.println("[DISCORD ERROR] Токен бота не настроен в конфигурации!");
+            System.err.println("[" + serverName + "]: Токен бота не настроен в конфигурации!");
             return;
         }
 
@@ -49,7 +49,7 @@ public class DiscordBotConfiguration extends ListenerAdapter {
                         .addOption(OptionType.INTEGER, "days", "За сколько дней собрать никнеймы (по умолчанию 7)", true)
         ).queue();
 
-        System.out.println("[DISCORD INFO] Бот успешно запущен и зарегистрировал слэш-команды!");
+        System.out.println("[" + serverName + "]: Бот успешно запущен и зарегистрировал слэш-команды!");
     }
 
     @Override
@@ -80,7 +80,7 @@ public class DiscordBotConfiguration extends ListenerAdapter {
             event.getHook().editOriginal(report).queue();
 
         } catch (Exception e) {
-            event.getHook().editOriginal("Произошла внутренняя ошибка при обработке запроса.").queue();
+            event.getHook().editOriginal( "[" + serverName + "]: Произошла внутренняя ошибка при обработке запроса.").queue();
             e.printStackTrace();
         }
     }

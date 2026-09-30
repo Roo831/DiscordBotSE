@@ -1,34 +1,28 @@
 package com.poptsov.discordbotse.service;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-@Service
 public class BackendAnalyticsService {
 
     private final RestClient restClient;
 
-    public BackendAnalyticsService(
-            @Value("${backend.api.url}") String baseUrl,
-            @Value("${backend.api.key}") String apiKey) {
-
+    public BackendAnalyticsService(String baseUrl, String apiKey, String httpDomain) {
         this.restClient = RestClient.builder()
-                .baseUrl(baseUrl)
+                .baseUrl(baseUrl + httpDomain)
                 .defaultHeader("X-API-KEY", apiKey)
                 .build();
     }
 
     public String getNicknames(int days) {
         try {
-           return restClient.get().uri(uriBuilder -> uriBuilder.path("/nicknames")
+            return restClient.get().uri(uriBuilder -> uriBuilder.path("/nicknames")
                             .queryParam("days", days)
                             .build())
                     .retrieve()
                     .body(String.class);
         } catch (RestClientException e) {
-            return "Ошибка соединения с сервером аналитики. Попробуйте позже.";
+            return "Error connecting to the analytics server. Please try again later..";
         }
     }
 
@@ -43,7 +37,7 @@ public class BackendAnalyticsService {
                     .retrieve()
                     .body(String.class);
         } catch (RestClientException e) {
-            return "Ошибка соединения с сервером аналитики. Попробуйте позже.";
+            return "Error connecting to the analytics server. Please try again later.";
         }
     }
 
@@ -58,7 +52,7 @@ public class BackendAnalyticsService {
                     .retrieve()
                     .body(String.class);
         } catch (RestClientException e) {
-            return "Ошибка соединения с сервером аналитики. Попробуйте позже.";
+            return "Error connecting to the analytics server. Please try again later.";
         }
     }
 }

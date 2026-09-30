@@ -4,9 +4,11 @@ spring:
 
 discord:
   bot:
-    token: ${DISCORD_API_KEY}
+    token:
+      engineers: ${DISCORD_ENGINEERS_API_KEY}
+      rust: ${DISCORD_RUST_API_KEY}
 
 backend:
   api:
-    url: http://${SERVER_IP}:${SERVER_PORT}/api/v1/analytics/engineers
+    url: http://${SERVER_IP}:${SERVER_PORT}/api/v1/analytics
     key: ${SERVER_API_KEY}
