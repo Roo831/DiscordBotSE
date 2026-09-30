@@ -17,12 +17,15 @@ public class DiscordBot extends ListenerAdapter {
 
     private String serverName;
 
+    private String prefixSlashCommand;
+
     private final BackendAnalyticsService backendAnalyticsService;
 
     public DiscordBot(String botToken, String serverName, BackendAnalyticsService backendAnalyticsService) {
         this.botToken = botToken;
         this.serverName = serverName;
         this.backendAnalyticsService = backendAnalyticsService;
+        this.prefixSlashCommand = serverName.toLowerCase();
     }
 
     @PostConstruct
@@ -38,14 +41,14 @@ public class DiscordBot extends ListenerAdapter {
 
         jda.awaitReady();
         jda.updateCommands().addCommands(
-                Commands.slash(serverName + "_stats_week", "Get player analytics for the week")
+                Commands.slash(prefixSlashCommand + "_stats_week", "Get player analytics for the week")
                         .addOption(OptionType.STRING, "nickname", "Player's Steam nickname", true),
-                Commands.slash(serverName  +"_stats_month", "Get player analytics for the month")
+                Commands.slash(prefixSlashCommand  +"_stats_month", "Get player analytics for the month")
                         .addOption(OptionType.STRING, "nickname", "Player's Steam nickname", true),
-                Commands.slash(serverName + "_raw_data", "Retrieve raw log entries for a player")
+                Commands.slash(prefixSlashCommand + "_raw_data", "Retrieve raw log entries for a player")
                         .addOption(OptionType.STRING, "nickname", "Player's Steam nickname", true)
                         .addOption(OptionType.INTEGER, "days", "Number of days of logs to collect (default: 3)", false),
-                Commands.slash(serverName + "_all_nicknames", "Retrieve the nicknames of all active players for the specified time period.")
+                Commands.slash(prefixSlashCommand + "_all_nicknames", "Retrieve the nicknames of all active players for the specified time period.")
                         .addOption(OptionType.INTEGER, "days", "How many days to collect nicknames (default: 7)", true)
         ).queue();
 
