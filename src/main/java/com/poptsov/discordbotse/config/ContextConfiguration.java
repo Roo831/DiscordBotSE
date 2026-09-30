@@ -33,6 +33,6 @@ public class ContextConfiguration {
 
     @Bean
     public DiscordBot engineersDiscordBot(@Value("${discord.bot.token.engineers}") String botToken, @Qualifier("backendAnalyticsServiceEngineers") BackendAnalyticsService backendAnalyticsServiceEngineers) {
-        return new DiscordBot(botToken, "Space Engineers", backendAnalyticsServiceEngineers);
+        return new DiscordBot(botToken, "Space_Engineers", backendAnalyticsServiceEngineers);
     }
 }
