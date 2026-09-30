@@ -38,14 +38,14 @@ public class DiscordBot extends ListenerAdapter {
 
         jda.awaitReady();
         jda.updateCommands().addCommands(
-                Commands.slash("stats_week", "Получить аналитику игрока за неделю")
+                Commands.slash(serverName + "_stats_week", "Получить аналитику игрока за неделю")
                         .addOption(OptionType.STRING, "nickname", "Никнейм игрока в Steam", true),
-                Commands.slash("stats_month", "Получить аналитику игрока за месяц")
+                Commands.slash(serverName  +"_stats_month", "Получить аналитику игрока за месяц")
                         .addOption(OptionType.STRING, "nickname", "Никнейм игрока в Steam", true),
-                Commands.slash("raw_data", "Получить сырые записи лога по игроку")
+                Commands.slash(serverName + "_raw_data", "Получить сырые записи лога по игроку")
                         .addOption(OptionType.STRING, "nickname", "Никнейм игрока в Steam", true)
                         .addOption(OptionType.INTEGER, "days", "За сколько дней собрать логи (по умолчанию 3)", false),
-                Commands.slash("all_nicknames", "Получить все никнеймы активных игроков за указанный промежуток времени")
+                Commands.slash(serverName + "_all_nicknames", "Получить все никнеймы активных игроков за указанный промежуток времени")
                         .addOption(OptionType.INTEGER, "days", "За сколько дней собрать никнеймы (по умолчанию 7)", true)
         ).queue();
 
