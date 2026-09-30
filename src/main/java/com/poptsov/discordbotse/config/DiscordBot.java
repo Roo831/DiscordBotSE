@@ -38,15 +38,15 @@ public class DiscordBot extends ListenerAdapter {
 
         jda.awaitReady();
         jda.updateCommands().addCommands(
-                Commands.slash(serverName + "_stats_week", "Получить аналитику игрока за неделю")
-                        .addOption(OptionType.STRING, "nickname", "Никнейм игрока в Steam", true),
-                Commands.slash(serverName  +"_stats_month", "Получить аналитику игрока за месяц")
-                        .addOption(OptionType.STRING, "nickname", "Никнейм игрока в Steam", true),
-                Commands.slash(serverName + "_raw_data", "Получить сырые записи лога по игроку")
-                        .addOption(OptionType.STRING, "nickname", "Никнейм игрока в Steam", true)
-                        .addOption(OptionType.INTEGER, "days", "За сколько дней собрать логи (по умолчанию 3)", false),
-                Commands.slash(serverName + "_all_nicknames", "Получить все никнеймы активных игроков за указанный промежуток времени")
-                        .addOption(OptionType.INTEGER, "days", "За сколько дней собрать никнеймы (по умолчанию 7)", true)
+                Commands.slash(serverName + "_stats_week", "Get player analytics for the week")
+                        .addOption(OptionType.STRING, "nickname", "Player's Steam nickname", true),
+                Commands.slash(serverName  +"_stats_month", "Get player analytics for the month")
+                        .addOption(OptionType.STRING, "nickname", "Player's Steam nickname", true),
+                Commands.slash(serverName + "_raw_data", "Retrieve raw log entries for a player")
+                        .addOption(OptionType.STRING, "nickname", "Player's Steam nickname", true)
+                        .addOption(OptionType.INTEGER, "days", "Number of days of logs to collect (default: 3)", false),
+                Commands.slash(serverName + "_all_nicknames", "Retrieve the nicknames of all active players for the specified time period.")
+                        .addOption(OptionType.INTEGER, "days", "How many days to collect nicknames (default: 7)", true)
         ).queue();
 
         System.out.println("[" + serverName + "]: Бот успешно запущен и зарегистрировал слэш-команды!");
@@ -77,11 +77,27 @@ public class DiscordBot extends ListenerAdapter {
                 return;
             }
 
-            event.getHook().editOriginal(report).queue();
+            int maxLength = 1900;
+            if (report == null || report.trim().isEmpty()) {
+                event.getHook().editOriginal("Data not found").queue();
+            } else if (report.length() <= maxLength) {
+                event.getHook().editOriginal(report).queue();
+            } else {
+                event.getHook().editOriginal(report.substring(0, maxLength) + "\n*(continued below...)*").queue();
+
+                for (int i = maxLength; i < report.length(); i += maxLength) {
+                    int endIndex = Math.min(i + maxLength, report.length());
+                    String chunk = report.substring(i, endIndex);
+
+                    try { Thread.sleep(500); } catch (InterruptedException e) {}
+                    event.getHook().sendMessage("```text\n" + chunk + "\n```").queue();
+                }
+            }
 
         } catch (Exception e) {
-            event.getHook().editOriginal( "[" + serverName + "]: Произошла внутренняя ошибка при обработке запроса.").queue();
+            System.err.println("[" + serverName + "]: Ошибка при обработке команды: " + e.getMessage());
             e.printStackTrace();
+            event.getHook().editOriginal("Произошла внутренняя ошибка при обработке запроса.").queue();
         }
     }
 }
