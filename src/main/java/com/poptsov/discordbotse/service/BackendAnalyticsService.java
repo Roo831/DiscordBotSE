@@ -1,58 +1,35 @@
 package com.poptsov.discordbotse.service;
 
+import com.poptsov.discordbotse.model.*;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
 public class BackendAnalyticsService {
-
     private final RestClient restClient;
 
     public BackendAnalyticsService(String baseUrl, String apiKey, String httpDomain) {
-        this.restClient = RestClient.builder()
-                .baseUrl(baseUrl + httpDomain)
-                .defaultHeader("X-API-KEY", apiKey)
-                .build();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000);
+        factory.setReadTimeout(10000);
+        this.restClient = RestClient.builder().baseUrl(baseUrl + httpDomain)
+                .requestFactory(factory).defaultHeader("X-API-KEY", apiKey).build();
     }
 
-    public String getNicknames(int days) {
-        try {
-            return restClient.get().uri(uriBuilder -> uriBuilder.path("/nicknames")
-                            .queryParam("days", days)
-                            .build())
-                    .retrieve()
-                    .body(String.class);
-        } catch (RestClientException e) {
-            return "Error connecting to the analytics server. Please try again later.";
-        }
+    public NicknameReport getNicknames(int days) {
+        return restClient.get().uri(builder -> builder.path("/nicknames").queryParam("days", days).build())
+                .accept(MediaType.APPLICATION_JSON).retrieve().body(NicknameReport.class);
     }
 
-    public String getPlayerReport(String nickname, int days) {
-        try {
-            return restClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/stats")
-                            .queryParam("nickname", nickname)
-                            .queryParam("days", days)
-                            .build())
-                    .retrieve()
-                    .body(String.class);
-        } catch (RestClientException e) {
-            return "Error connecting to the analytics server. Please try again later.";
-        }
+    public PlayerActivityReport getPlayerReport(String nickname, int days) {
+        return restClient.get().uri(builder -> builder.path("/stats")
+                        .queryParam("nickname", "{nickname}").queryParam("days", days).build(nickname))
+                .accept(MediaType.APPLICATION_JSON).retrieve().body(PlayerActivityReport.class);
     }
 
-    public String getRawDataReport(String nickname, int days) {
-        try {
-            return restClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/raw")
-                            .queryParam("nickname", nickname)
-                            .queryParam("days", days)
-                            .build())
-                    .retrieve()
-                    .body(String.class);
-        } catch (RestClientException e) {
-            return "Error connecting to the analytics server. Please try again later.";
-        }
+    public RawDataReport getRawDataReport(String nickname, int days) {
+        return restClient.get().uri(builder -> builder.path("/raw")
+                        .queryParam("nickname", "{nickname}").queryParam("days", days).build(nickname))
+                .accept(MediaType.APPLICATION_JSON).retrieve().body(RawDataReport.class);
     }
 }
