@@ -87,7 +87,85 @@ public class ReportFormatter {
     }
 
     public MessageEmbed error(String message) {
-        return base("Could not load report", message).setColor(0xED4245).build();
+        return base("Could not load report", safe(message)).setColor(0xED4245).build();
+    }
+
+    public MessageEmbed watchStarted(WatchRegistration registration) {
+        var watch = registration.subscription();
+        String state = registration.alreadyOnline()
+                ? "🟢 Игрок уже онлайн. Уведомление ожидает отправки в этот канал."
+                : watch.status().equals("PENDING") ? "📨 Вход обнаружен. Уведомление ожидает отправки."
+                : "🔔 Сообщу в этом канале, когда игрок появится онлайн.";
+        return base("Слежение включено", "**" + safe(watch.nickname()) + "**\n\n" + state
+                + "\n\nУведомлю **один раз**. Подписка сохранится после перезапуска.")
+                .setColor(registration.alreadyOnline() ? 0x57F287 : 0xFEE75C)
+                .addField("🧾 Номер подписки", "`" + watch.id() + "`", false)
+                .setFooter("По никнейму • Смена ника может помешать обнаружению").build();
+    }
+
+    public List<MessageEmbed> watchlist(List<WatchSubscription> watches) {
+        List<String> lines = watches.stream().map(watch ->
+                (watch.status().equals("PENDING") ? "📨" : "🟡") + " **" + safe(watch.nickname()) + "**\n"
+                        + (watch.status().equals("PENDING") ? "Уведомление ожидает отправки" : "Ожидаем вход")
+                        + " · ID: `" + watch.id() + "`\n").toList();
+        var pages = textPages("Мои подписки", "**" + watches.size() + "** в этом канале · Лимит **25** на игру\n"
+                        + "Для отмены используйте команду **unwatch** с номером подписки.",
+                lines, "В этом канале пока нет подписок.", "UTC");
+        List<MessageEmbed> result = new ArrayList<>();
+        for (int i = 0; i < pages.size(); i++) {
+            result.add(new EmbedBuilder(pages.get(i)).setFooter("Одноразовые подписки • Страница "
+                    + (i + 1) + "/" + pages.size()).build());
+        }
+        return List.copyOf(result);
+    }
+
+    public MessageEmbed watchRemoved() {
+        return base("Слежение отключено", "🔕 Подписка отменена. Уже отправляемое сообщение ещё может прийти.")
+                .setColor(0x95A5A6).build();
+    }
+
+    public MessageEmbed online(WatchNotification event) {
+        return base("Игрок онлайн", "🟢 **" + safe(event.nickname()) + "** замечен на сервере.\n\n"
+                        + "🕒 Обнаружен <t:" + event.observedAt().getEpochSecond() + ":R>\n"
+                        + "📍 Сервер **" + game + "**")
+                .setColor(0x57F287).setTimestamp(event.observedAt())
+                .setFooter("Одноразовое уведомление • По никнейму • Время обнаружения, не точное время входа").build();
+    }
+
+    public List<MessageEmbed> similarActivity(SimilarActivityReport report) {
+        String description = "**" + safe(report.nickname()) + "** · " + report.days() + " дн.\n"
+                + period(report.periodStart(), report.periodEnd()) + "\n\n"
+                + "Пересечение по времени **не подтверждает** дружбу или общую команду.";
+        List<EmbedBuilder> pages = new ArrayList<>();
+        pages.add(base("Похожая активность", description).setColor(0x9B59B6)
+                .addField("⏱️ Активность игрока", duration(report.totalSeconds()), true)
+                .addField("👥 Есть пересечения", String.valueOf(report.players().size()), true)
+                .addField("📊 Как считается сходство", "Совместное время ÷ время, когда хотя бы один был онлайн. "
+                        + "Это сходство расписания, а не вероятность игры в команде.", false));
+        if (report.players().isEmpty()) {
+            pages.getFirst().addField("📭 Нет пересечений", "За выбранный период совпадений в логах не найдено.", false);
+        }
+        for (int first = 0; first < report.players().size(); first += 4) {
+            var page = base("Похожая активность · рейтинг", description).setColor(0x9B59B6);
+            for (int i = first; i < Math.min(first + 4, report.players().size()); i++) {
+                var player = report.players().get(i);
+                int bars = Math.max(0, Math.min(10, (int) Math.round(player.similarityPercent() / 10)));
+                String medal = i == 0 ? "🥇" : i == 1 ? "🥈" : i == 2 ? "🥉" : "▫️";
+                String name = medal + " " + (i + 1) + ". " + safe(player.nickname());
+                if (name.length() > 240) name = name.substring(0, Character.isHighSurrogate(name.charAt(238)) ? 238 : 239) + "…";
+                page.addField(name, "`" + "▰".repeat(bars) + "▱".repeat(10 - bars) + "` **"
+                        + percent(player.similarityPercent()) + "** сходства\n"
+                        + "⏱️ Вместе **" + duration(player.overlapSeconds()) + "** · 📅 Общих дней: **" + player.sharedDays() + "**\n"
+                        + "Совместно: **" + percent(player.targetOverlapPercent()) + "** времени цели / **"
+                        + percent(player.playerOverlapPercent()) + "** времени этого игрока", false);
+            }
+            pages.add(page);
+        }
+        return finish(pages, report.timeZone());
+    }
+
+    private static String percent(double value) {
+        return String.format(Locale.ROOT, "%.1f%%", value);
     }
 
     private List<MessageEmbed> textPages(String title, String description, List<String> lines, String empty, String zone) {

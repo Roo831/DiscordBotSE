@@ -29,6 +29,87 @@ import static org.mockito.Mockito.*;
 
 class DiscordBotTest {
     @Test
+    void showsBackendWatchValidationReasonAndHandlesNonJsonErrors() throws Exception {
+        for (boolean jsonError : new boolean[]{true, false}) {
+            var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            server.createContext("/api/v1/analytics/rust/watchlist", exchange -> {
+                byte[] body = (jsonError ? "{\"code\":\"INVALID_REQUEST\",\"message\":\"At most 25 active subscriptions per game.\"}"
+                        : "Bad request").getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().add("Content-Type", jsonError ? "application/json" : "text/plain");
+                exchange.sendResponseHeaders(400, body.length);
+                exchange.getResponseBody().write(body);
+                exchange.close();
+            });
+            server.start();
+            try {
+                var backend = new BackendAnalyticsService("http://127.0.0.1:" + server.getAddress().getPort()
+                        + "/api/v1/analytics", "test-key", "/rust");
+                var bot = new DiscordBot("NOT_SET", "RUST", backend);
+                var command = mock(SlashCommandInteractionEvent.class, RETURNS_DEEP_STUBS);
+                when(command.getName()).thenReturn("rust_watch");
+                when(command.isFromGuild()).thenReturn(true);
+                when(command.getUser().getId()).thenReturn("42");
+                when(command.getChannel().getId()).thenReturn("100");
+                when(command.getOption("nickname").getAsString()).thenReturn("Roo");
+                var reply = mock(WebhookMessageEditAction.class, RETURNS_SELF);
+                when(command.getHook().editOriginalEmbeds(any(MessageEmbed.class))).thenReturn(reply);
+                bot.onSlashCommandInteraction(command);
+                var embed = ArgumentCaptor.forClass(MessageEmbed.class);
+                verify(command.getHook()).editOriginalEmbeds(embed.capture());
+                assertEquals(0xED4245, embed.getValue().getColorRaw());
+                assertTrue(embed.getValue().getDescription().contains(jsonError ? "25 active subscriptions" : "недоступен"));
+            } finally {
+                server.stop(0);
+            }
+        }
+    }
+
+    @Test
+    void createsAnOwnerScopedWatchAndConfirmsItPrivately() throws Exception {
+        var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        var query = new java.util.concurrent.atomic.AtomicReference<String>();
+        server.createContext("/api/v1/analytics/rust/watchlist", exchange -> {
+            query.set(exchange.getRequestURI().getRawQuery());
+            byte[] json = """
+                    {"subscription":{"id":"watch-1","nickname":"Roo + &","userId":"42",
+                    "channelId":"100","createdAt":"2026-10-12T10:00:00Z","status":"WAITING"},
+                    "alreadyOnline":false}
+                    """.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, json.length);
+            exchange.getResponseBody().write(json);
+            exchange.close();
+        });
+        server.start();
+        try {
+            var backend = new BackendAnalyticsService("http://127.0.0.1:" + server.getAddress().getPort()
+                    + "/api/v1/analytics", "test-key", "/rust");
+            var bot = new DiscordBot("NOT_SET", "RUST", backend);
+            var command = mock(SlashCommandInteractionEvent.class, RETURNS_DEEP_STUBS);
+            when(command.getName()).thenReturn("rust_watch");
+            when(command.isFromGuild()).thenReturn(true);
+            when(command.getUser().getId()).thenReturn("42");
+            when(command.getChannel().getId()).thenReturn("100");
+            when(command.getOption("nickname").getAsString()).thenReturn("Roo + &");
+            var reply = mock(WebhookMessageEditAction.class, RETURNS_SELF);
+            when(command.getHook().editOriginalEmbeds(any(MessageEmbed.class))).thenReturn(reply);
+
+            bot.onSlashCommandInteraction(command);
+
+            var embed = ArgumentCaptor.forClass(MessageEmbed.class);
+            verify(command.getHook()).editOriginalEmbeds(embed.capture());
+            assertTrue(embed.getValue().getTitle().contains("Слежение"));
+            assertTrue(embed.getValue().getDescription().contains("Roo + &"));
+            assertNotNull(query.get());
+            assertTrue(query.get().contains("userId=42"));
+            assertTrue(query.get().contains("channelId=100"));
+            verify(command).deferReply(true);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void sendsLargeNicknameJsonAsNavigableColouredEmbeds() throws Exception {
         var now = LocalDateTime.parse("2026-10-12T12:04:01.015157368");
         var names = IntStream.range(0, 500).mapToObj(i -> "Player " + i + " 🚀 _nickname_ + &").toList();

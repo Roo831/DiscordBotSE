@@ -2,11 +2,16 @@ package com.poptsov.discordbotse.config;
 
 import com.poptsov.discordbotse.presentation.ReportFormatter;
 import com.poptsov.discordbotse.service.BackendAnalyticsService;
+import com.poptsov.discordbotse.service.DeliveryReceipts;
+import com.poptsov.discordbotse.service.WatchlistDispatcher;
+import com.poptsov.discordbotse.model.WatchNotification;
+import com.poptsov.discordbotse.model.WatchRegistration;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.MessageEmbed;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -15,7 +20,10 @@ import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
+import org.springframework.scheduling.annotation.Scheduled;
 
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -26,15 +34,22 @@ public class DiscordBot extends ListenerAdapter {
     private final String prefixSlashCommand;
     private final BackendAnalyticsService backendAnalyticsService;
     private final ReportFormatter formatter;
+    private final WatchlistDispatcher watchlistDispatcher;
     private final Map<String, ReportPages> reports = new LinkedHashMap<>();
     private JDA jda;
 
     public DiscordBot(String botToken, String serverName, BackendAnalyticsService backendAnalyticsService) {
+        this(botToken, serverName, backendAnalyticsService, Path.of("bot_logs"));
+    }
+
+    public DiscordBot(String botToken, String serverName, BackendAnalyticsService backendAnalyticsService, Path receiptsDirectory) {
         this.botToken = botToken;
         this.serverName = serverName;
         this.backendAnalyticsService = backendAnalyticsService;
         this.prefixSlashCommand = serverName.toLowerCase(Locale.ROOT);
         this.formatter = new ReportFormatter(serverName);
+        this.watchlistDispatcher = new WatchlistDispatcher(backendAnalyticsService,
+                new DeliveryReceipts(receiptsDirectory.resolve(prefixSlashCommand + "-receipts.properties")), this::sendNotification);
     }
 
     @PostConstruct
@@ -54,26 +69,49 @@ public class DiscordBot extends ListenerAdapter {
                 Commands.slash(prefixSlashCommand + "_raw_data", "View a player's connection events")
                         .addOptions(nicknameOption(), daysOption("Number of days (default: 3)")),
                 Commands.slash(prefixSlashCommand + "_all_nicknames", "View all active players")
-                        .addOptions(daysOption("Number of days (default: 7)"))
+                        .addOptions(daysOption("Number of days (default: 7)")),
+                Commands.slash(prefixSlashCommand + "_watch", "🔔 Уведомить о следующем появлении игрока онлайн")
+                        .addOptions(nicknameOption()),
+                Commands.slash(prefixSlashCommand + "_watchlist", "📋 Мои подписки в этом канале"),
+                Commands.slash(prefixSlashCommand + "_unwatch", "🔕 Отменить подписку на игрока")
+                        .addOption(OptionType.STRING, "subscription_id", "Номер подписки из watchlist", true),
+                Commands.slash(prefixSlashCommand + "_similar", "👥 Найти игроков с похожей активностью")
+                        .addOptions(nicknameOption(), daysOption("Период в днях (по умолчанию 7)"))
         ).queue(null, error -> System.err.println("[" + serverName + "]: Command registration failed: " + error.getMessage()));
     }
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (!event.getName().startsWith(prefixSlashCommand + "_")) return;
+        String command = event.getName().substring(prefixSlashCommand.length() + 1);
+        boolean watchCommand = Set.of("watch", "watchlist", "unwatch").contains(command);
         try {
-            event.deferReply().complete();
+            if (watchCommand) event.deferReply(true).complete();
+            else event.deferReply().complete();
         } catch (Exception error) {
             System.err.println("[" + serverName + "]: Could not acknowledge command: " + error.getMessage());
             return;
         }
         try {
-            String command = event.getName().substring(prefixSlashCommand.length() + 1);
+            if (watchCommand && !event.isFromGuild()) {
+                throw new IllegalArgumentException("Используйте слежение в канале Discord-сервера.");
+            }
+            WatchRegistration registration = command.equals("watch")
+                    ? backendAnalyticsService.watch(nickname(event), event.getUser().getId(), event.getChannel().getId()) : null;
             List<MessageEmbed> pages = switch (command) {
                 case "stats_week" -> formatter.playerActivity(backendAnalyticsService.getPlayerReport(nickname(event), 7));
                 case "stats_month" -> formatter.playerActivity(backendAnalyticsService.getPlayerReport(nickname(event), 30));
                 case "raw_data" -> formatter.rawData(backendAnalyticsService.getRawDataReport(nickname(event), days(event, 3)));
                 case "all_nicknames" -> formatter.nicknames(backendAnalyticsService.getNicknames(days(event, 7)));
+                case "similar" -> formatter.similarActivity(backendAnalyticsService.getSimilarActivity(nickname(event), days(event, 7)));
+                case "watch" -> List.of(formatter.watchStarted(registration));
+                case "watchlist" -> formatter.watchlist(backendAnalyticsService.getWatchlist(event.getUser().getId(), event.getChannel().getId()));
+                case "unwatch" -> {
+                    var option = event.getOption("subscription_id");
+                    if (option == null || option.getAsString().isBlank()) throw new IllegalArgumentException("Укажите номер подписки из watchlist.");
+                    backendAnalyticsService.unwatch(option.getAsString(), event.getUser().getId(), event.getChannel().getId());
+                    yield List.of(formatter.watchRemoved());
+                }
                 default -> throw new IllegalArgumentException("This command is no longer available.");
             };
             String id = UUID.randomUUID().toString();
@@ -86,9 +124,20 @@ public class DiscordBot extends ListenerAdapter {
             }
             var reply = event.getHook().editOriginalEmbeds(pages.getFirst()).setAllowedMentions(Collections.emptyList());
             if (pages.size() > 1) reply.setActionRow(buttons(id, 0, pages.size()));
+            else if (registration != null) reply.setActionRow(Button.danger(
+                    prefixSlashCommand + ":unwatch:" + registration.subscription().id(), "🔕 Отменить слежение"));
             reply.queue(null, error -> System.err.println("[" + serverName + "]: Could not send report: " + error.getMessage()));
         } catch (IllegalArgumentException error) {
             event.getHook().editOriginalEmbeds(formatter.error(error.getMessage())).queue();
+        } catch (RestClientResponseException error) {
+            String message = "Сервис аналитики недоступен. Попробуйте ещё раз позже.";
+            if (error.getStatusCode().value() == 400) {
+                try {
+                    var body = error.getResponseBodyAs(Map.class);
+                    if (body != null && body.get("message") instanceof String reason) message = reason;
+                } catch (RuntimeException ignored) { }
+            }
+            event.getHook().editOriginalEmbeds(formatter.error(message)).setAllowedMentions(Collections.emptyList()).queue();
         } catch (RestClientException error) {
             System.err.println("[" + serverName + "]: Analytics request failed: " + error.getMessage());
             event.getHook().editOriginalEmbeds(formatter.error("The analytics service is unavailable. Please try again later.")).queue();
@@ -100,6 +149,10 @@ public class DiscordBot extends ListenerAdapter {
 
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
+        if (event.getComponentId().startsWith(prefixSlashCommand + ":unwatch:")) {
+            cancelWatch(event);
+            return;
+        }
         if (!event.getComponentId().startsWith(prefixSlashCommand + ":report:")) return;
         String[] parts = event.getComponentId().split(":");
         ReportPages report;
@@ -122,6 +175,33 @@ public class DiscordBot extends ListenerAdapter {
         } catch (IllegalArgumentException error) {
             event.reply("This page is not available. Run the command again.").setEphemeral(true).queue();
         }
+    }
+
+    private void cancelWatch(ButtonInteractionEvent event) {
+        try {
+            event.deferEdit().complete();
+            if (!event.isFromGuild()) throw new IllegalArgumentException("Используйте слежение в канале Discord-сервера.");
+            String id = event.getComponentId().substring((prefixSlashCommand + ":unwatch:").length());
+            backendAnalyticsService.unwatch(id, event.getUser().getId(), event.getChannel().getId());
+            event.getHook().editOriginalEmbeds(formatter.watchRemoved()).setComponents(List.of()).queue();
+        } catch (Exception error) {
+            event.getHook().editOriginalEmbeds(formatter.error("Не удалось отменить подписку. Попробуйте ещё раз.")).queue();
+        }
+    }
+
+    @Scheduled(fixedDelay = 30000, initialDelay = 30000)
+    public void pollWatchlist() {
+        if (jda != null && jda.getStatus() == JDA.Status.CONNECTED) watchlistDispatcher.poll();
+    }
+
+    private String sendNotification(WatchNotification event) {
+        var channel = jda.getGuildChannelById(event.channelId());
+        if (!(channel instanceof MessageChannel messages)) {
+            throw new IllegalStateException("Notification channel is not accessible");
+        }
+        return messages.sendMessage("<@" + event.userId() + ">")
+                .setEmbeds(formatter.online(event)).setAllowedMentions(Collections.emptyList())
+                .mentionUsers(event.userId()).complete().getId();
     }
 
     private List<Button> buttons(String id, int page, int count) {

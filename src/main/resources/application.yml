@@ -1,6 +1,10 @@
 spring:
   application:
     name: DiscordBotService
+  task:
+    scheduling:
+      pool:
+        size: 2
 
 discord:
   bot:
@@ -12,3 +16,6 @@ backend:
   api:
     url: http://${SERVER_IP}:${SERVER_PORT}/api/v1/analytics
     key: ${SERVER_API_KEY}
+
+watchlist:
+  receipts-directory: ${WATCHLIST_RECEIPTS_DIRECTORY:./bot_logs}
