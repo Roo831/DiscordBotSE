@@ -3,7 +3,9 @@ package com.poptsov.discordbotse.config;
 import com.poptsov.discordbotse.model.PlayerActivityReport;
 import com.poptsov.discordbotse.model.PlayerActivityReport.DayActivity;
 import com.poptsov.discordbotse.model.PlayerActivityReport.Session;
+import com.poptsov.discordbotse.model.NicknameReport;
 import com.poptsov.discordbotse.service.BackendAnalyticsService;
+import com.sun.net.httpserver.HttpServer;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.requests.restaction.WebhookMessageEditAction;
 import net.dv8tion.jda.api.requests.restaction.interactions.MessageEditCallbackAction;
@@ -12,16 +14,81 @@ import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import tools.jackson.databind.json.JsonMapper;
 
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class DiscordBotTest {
+    @Test
+    void sendsLargeNicknameJsonAsNavigableColouredEmbeds() throws Exception {
+        var now = LocalDateTime.parse("2026-10-12T12:04:01.015157368");
+        var names = IntStream.range(0, 500).mapToObj(i -> "Player " + i + " 🚀 _nickname_ + &").toList();
+        byte[] json = JsonMapper.builder().build().writeValueAsString(
+                new NicknameReport(1, now.minusDays(1), now, "GMT", names)).getBytes(StandardCharsets.UTF_8);
+        assertTrue(json.length > 2000);
+        var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/api/v1/analytics/rust/nicknames", exchange -> {
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, json.length);
+            exchange.getResponseBody().write(json);
+            exchange.close();
+        });
+        server.start();
+        try {
+            var backend = new BackendAnalyticsService("http://127.0.0.1:" + server.getAddress().getPort()
+                    + "/api/v1/analytics", "test-key", "/rust");
+            var bot = new DiscordBot("NOT_SET", "RUST", backend);
+            var command = mock(SlashCommandInteractionEvent.class, RETURNS_DEEP_STUBS);
+            when(command.getName()).thenReturn("rust_all_nicknames");
+            when(command.getUser().getIdLong()).thenReturn(42L);
+            when(command.getOption("days").getAsInt()).thenReturn(1);
+            var reply = mock(WebhookMessageEditAction.class, RETURNS_SELF);
+            when(command.getHook().editOriginalEmbeds(any(MessageEmbed.class))).thenReturn(reply);
+
+            bot.onSlashCommandInteraction(command);
+
+            var firstPage = ArgumentCaptor.forClass(MessageEmbed.class);
+            verify(command.getHook()).editOriginalEmbeds(firstPage.capture());
+            assertEquals(0xE67E22, firstPage.getValue().getColorRaw());
+            assertTrue(firstPage.getValue().getDescription().contains("500 players"));
+            assertTrue(firstPage.getValue().getDescription().contains("Player 0"));
+            assertTrue(firstPage.getValue().getDescription().length() <= 4096);
+            assertTrue(firstPage.getValue().getLength() <= 6000);
+            ArgumentCaptor<Collection<Button>> buttons = ArgumentCaptor.captor();
+            verify(reply).setActionRow(buttons.capture());
+            long players = firstPage.getValue().getDescription().lines().filter(line -> line.startsWith("• ")).count();
+            List<Button> navigation = List.copyOf(buttons.getValue());
+            for (int pageIndex = 1; !navigation.getLast().isDisabled(); pageIndex++) {
+                assertTrue(pageIndex < 20, "Navigation must reach the final page");
+                var click = mock(ButtonInteractionEvent.class, RETURNS_DEEP_STUBS);
+                when(click.getComponentId()).thenReturn(navigation.getLast().getId());
+                when(click.getUser().getIdLong()).thenReturn(42L);
+                var edit = mock(MessageEditCallbackAction.class, RETURNS_SELF);
+                when(click.editMessageEmbeds(any(MessageEmbed.class))).thenReturn(edit);
+                bot.onButtonInteraction(click);
+                var page = ArgumentCaptor.forClass(MessageEmbed.class);
+                verify(click).editMessageEmbeds(page.capture());
+                assertTrue(page.getValue().getDescription().length() <= 4096);
+                assertTrue(page.getValue().getLength() <= 6000);
+                players += page.getValue().getDescription().lines().filter(line -> line.startsWith("• ")).count();
+                verify(edit).setActionRow(buttons.capture());
+                navigation = List.copyOf(buttons.getValue());
+            }
+            assertEquals(500, players);
+        } finally {
+            server.stop(0);
+        }
+    }
+
     @Test
     void navigatesWithoutDuplicateButtonIdsAndRestrictsNavigationToTheRequester() {
         var backend = mock(BackendAnalyticsService.class);
