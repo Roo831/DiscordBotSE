@@ -16,6 +16,9 @@ public class ContextConfiguration {
     @Value("${backend.api.key}")
     String backendApiKey;
 
+    @Value("${watchlist.receipts-directory:./bot_logs}")
+    String receiptsDirectory;
+
     @Bean
     public BackendAnalyticsService backendAnalyticsServiceEngineers() {
         return new BackendAnalyticsService(baseUrl, backendApiKey, "/engineers");
@@ -28,11 +31,11 @@ public class ContextConfiguration {
 
     @Bean
     public DiscordBot rustDiscordBot(@Value("${discord.bot.token.rust}") String botToken, @Qualifier("backendAnalyticsServiceRust") BackendAnalyticsService backendAnalyticsServiceRust) {
-        return new DiscordBot(botToken, "RUST", backendAnalyticsServiceRust);
+        return new DiscordBot(botToken, "RUST", backendAnalyticsServiceRust, java.nio.file.Path.of(receiptsDirectory));
     }
 
     @Bean
     public DiscordBot engineersDiscordBot(@Value("${discord.bot.token.engineers}") String botToken, @Qualifier("backendAnalyticsServiceEngineers") BackendAnalyticsService backendAnalyticsServiceEngineers) {
-        return new DiscordBot(botToken, "Space_Engineers", backendAnalyticsServiceEngineers);
+        return new DiscordBot(botToken, "Space_Engineers", backendAnalyticsServiceEngineers, java.nio.file.Path.of(receiptsDirectory));
     }
 }
