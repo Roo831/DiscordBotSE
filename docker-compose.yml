@@ -1,6 +1,6 @@
 services:
   discord-bot:
-    build: roo831/discord-bot-se:latest
+    image: roo831/discord-bot-se:latest
     pull_policy: always
     container_name: discord-bot-se
     restart: always
