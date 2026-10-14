@@ -154,7 +154,7 @@ public class ReportFormatter {
                 String name = medal + " " + (i + 1) + ". " + safe(player.nickname());
                 if (name.length() > 240) name = name.substring(0, Character.isHighSurrogate(name.charAt(238)) ? 238 : 239) + "…";
                 page.addField(name, "`" + "▰".repeat(bars) + "▱".repeat(10 - bars) + "` **"
-                        + percent(player.similarityPercent()) + "** сходства\n"
+                        + percent(player.similarityPercent()) + "** similarities\n"
                         + "⏱️ Spent Together **" + duration(player.overlapSeconds()) + "** · 📅 Total days: **" + player.sharedDays() + "**\n"
                         + "Jointly: **" + percent(player.targetOverlapPercent()) + "** of the target time / **"
                         + percent(player.playerOverlapPercent()) + "** of this player's time", false);

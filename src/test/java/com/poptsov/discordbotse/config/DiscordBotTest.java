@@ -57,7 +57,7 @@ class DiscordBotTest {
                 var embed = ArgumentCaptor.forClass(MessageEmbed.class);
                 verify(command.getHook()).editOriginalEmbeds(embed.capture());
                 assertEquals(0xED4245, embed.getValue().getColorRaw());
-                assertTrue(embed.getValue().getDescription().contains(jsonError ? "25 active subscriptions" : "недоступен"));
+                assertTrue(embed.getValue().getDescription().contains(jsonError ? "25 active subscriptions" : "unavailable"));
             } finally {
                 server.stop(0);
             }
@@ -98,7 +98,7 @@ class DiscordBotTest {
 
             var embed = ArgumentCaptor.forClass(MessageEmbed.class);
             verify(command.getHook()).editOriginalEmbeds(embed.capture());
-            assertTrue(embed.getValue().getTitle().contains("Слежение"));
+            assertTrue(embed.getValue().getTitle().contains("Tracking"));
             assertTrue(embed.getValue().getDescription().contains("Roo + &"));
             assertNotNull(query.get());
             assertTrue(query.get().contains("userId=42"));
