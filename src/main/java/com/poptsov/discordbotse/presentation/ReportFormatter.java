@@ -96,7 +96,7 @@ public class ReportFormatter {
                 ? "🟢 The player is already online. A notification is pending delivery to this channel."
                 : watch.status().equals("PENDING") ? "📨 Login detected. Notification pending dispatch."
                 : "🔔 I’ll let you know in this channel when the player comes online.";
-        return base("Слежение включено", "**" + safe(watch.nickname()) + "**\n\n" + state
+        return base("Tracking enabled", "**" + safe(watch.nickname()) + "**\n\n" + state
                 + "\n\nI will notify you **once**. The subscription will persist after a restart.")
                 .setColor(registration.alreadyOnline() ? 0x57F287 : 0xFEE75C)
                 .addField("🧾 Subscription number", "`" + watch.id() + "`", false)
@@ -108,7 +108,7 @@ public class ReportFormatter {
                 (watch.status().equals("PENDING") ? "📨" : "🟡") + " **" + safe(watch.nickname()) + "**\n"
                         + (watch.status().equals("PENDING") ? "Notification pending dispatch" : "Awaiting input")
                         + " · ID: `" + watch.id() + "`\n").toList();
-        var pages = textPages("Мои подписки", "**" + watches.size() + "** в этом канале · Лимит **25** на игру\n"
+        var pages = textPages("My subscriptions", "**" + watches.size() + "** in this channel · Limit of **25** per game\n"
                         + "To cancel, use the **unwatch** command with the subscription number.",
                 lines, "There are no subscriptions in this channel yet.", "UTC");
         List<MessageEmbed> result = new ArrayList<>();
