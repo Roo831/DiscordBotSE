@@ -70,13 +70,13 @@ public class DiscordBot extends ListenerAdapter {
                         .addOptions(nicknameOption(), daysOption("Number of days (default: 3)")),
                 Commands.slash(prefixSlashCommand + "_all_nicknames", "View all active players")
                         .addOptions(daysOption("Number of days (default: 7)")),
-                Commands.slash(prefixSlashCommand + "_watch", "🔔 Уведомить о следующем появлении игрока онлайн")
+                Commands.slash(prefixSlashCommand + "_watch", "🔔 Notify when the player next comes online")
                         .addOptions(nicknameOption()),
-                Commands.slash(prefixSlashCommand + "_watchlist", "📋 Мои подписки в этом канале"),
-                Commands.slash(prefixSlashCommand + "_unwatch", "🔕 Отменить подписку на игрока")
-                        .addOption(OptionType.STRING, "subscription_id", "Номер подписки из watchlist", true),
-                Commands.slash(prefixSlashCommand + "_similar", "👥 Найти игроков с похожей активностью")
-                        .addOptions(nicknameOption(), daysOption("Период в днях (по умолчанию 7)"))
+                Commands.slash(prefixSlashCommand + "_watchlist", "📋 My subscriptions in this channel"),
+                Commands.slash(prefixSlashCommand + "_unwatch", "🔕 Unsubscribe from the player")
+                        .addOption(OptionType.STRING, "subscription_id", "Subscription number from watchlist", true),
+                Commands.slash(prefixSlashCommand + "_similar", "👥 Find players with similar activity")
+                        .addOptions(nicknameOption(), daysOption("Period in days (default: 7)"))
         ).queue(null, error -> System.err.println("[" + serverName + "]: Command registration failed: " + error.getMessage()));
     }
 
@@ -94,7 +94,7 @@ public class DiscordBot extends ListenerAdapter {
         }
         try {
             if (watchCommand && !event.isFromGuild()) {
-                throw new IllegalArgumentException("Используйте слежение в канале Discord-сервера.");
+                throw new IllegalArgumentException("Use tracking in the Discord server channel.");
             }
             WatchRegistration registration = command.equals("watch")
                     ? backendAnalyticsService.watch(nickname(event), event.getUser().getId(), event.getChannel().getId()) : null;
@@ -108,7 +108,7 @@ public class DiscordBot extends ListenerAdapter {
                 case "watchlist" -> formatter.watchlist(backendAnalyticsService.getWatchlist(event.getUser().getId(), event.getChannel().getId()));
                 case "unwatch" -> {
                     var option = event.getOption("subscription_id");
-                    if (option == null || option.getAsString().isBlank()) throw new IllegalArgumentException("Укажите номер подписки из watchlist.");
+                    if (option == null || option.getAsString().isBlank()) throw new IllegalArgumentException("Specify the subscription number from the watchlist.");
                     backendAnalyticsService.unwatch(option.getAsString(), event.getUser().getId(), event.getChannel().getId());
                     yield List.of(formatter.watchRemoved());
                 }
@@ -125,12 +125,12 @@ public class DiscordBot extends ListenerAdapter {
             var reply = event.getHook().editOriginalEmbeds(pages.getFirst()).setAllowedMentions(Collections.emptyList());
             if (pages.size() > 1) reply.setActionRow(buttons(id, 0, pages.size()));
             else if (registration != null) reply.setActionRow(Button.danger(
-                    prefixSlashCommand + ":unwatch:" + registration.subscription().id(), "🔕 Отменить слежение"));
+                    prefixSlashCommand + ":unwatch:" + registration.subscription().id(), "🔕 Stop tracking"));
             reply.queue(null, error -> System.err.println("[" + serverName + "]: Could not send report: " + error.getMessage()));
         } catch (IllegalArgumentException error) {
             event.getHook().editOriginalEmbeds(formatter.error(error.getMessage())).queue();
         } catch (RestClientResponseException error) {
-            String message = "Сервис аналитики недоступен. Попробуйте ещё раз позже.";
+            String message = "The analytics service is unavailable. Please try again later.";
             if (error.getStatusCode().value() == 400) {
                 try {
                     var body = error.getResponseBodyAs(Map.class);
@@ -180,12 +180,12 @@ public class DiscordBot extends ListenerAdapter {
     private void cancelWatch(ButtonInteractionEvent event) {
         try {
             event.deferEdit().complete();
-            if (!event.isFromGuild()) throw new IllegalArgumentException("Используйте слежение в канале Discord-сервера.");
+            if (!event.isFromGuild()) throw new IllegalArgumentException("Use tracking in the Discord server channel.");
             String id = event.getComponentId().substring((prefixSlashCommand + ":unwatch:").length());
             backendAnalyticsService.unwatch(id, event.getUser().getId(), event.getChannel().getId());
             event.getHook().editOriginalEmbeds(formatter.watchRemoved()).setComponents(List.of()).queue();
         } catch (Exception error) {
-            event.getHook().editOriginalEmbeds(formatter.error("Не удалось отменить подписку. Попробуйте ещё раз.")).queue();
+            event.getHook().editOriginalEmbeds(formatter.error("Unable to cancel the subscription. Please try again.")).queue();
         }
     }
 

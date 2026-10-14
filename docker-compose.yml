@@ -1,6 +1,7 @@
 services:
   discord-bot:
-    build: .
+    build: roo831/discord-bot-se:latest
+    pull_policy: always
     container_name: discord-bot-se
     restart: always
     env_file:

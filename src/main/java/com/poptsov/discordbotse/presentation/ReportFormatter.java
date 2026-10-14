@@ -93,60 +93,60 @@ public class ReportFormatter {
     public MessageEmbed watchStarted(WatchRegistration registration) {
         var watch = registration.subscription();
         String state = registration.alreadyOnline()
-                ? "🟢 Игрок уже онлайн. Уведомление ожидает отправки в этот канал."
-                : watch.status().equals("PENDING") ? "📨 Вход обнаружен. Уведомление ожидает отправки."
-                : "🔔 Сообщу в этом канале, когда игрок появится онлайн.";
+                ? "🟢 The player is already online. A notification is pending delivery to this channel."
+                : watch.status().equals("PENDING") ? "📨 Login detected. Notification pending dispatch."
+                : "🔔 I’ll let you know in this channel when the player comes online.";
         return base("Слежение включено", "**" + safe(watch.nickname()) + "**\n\n" + state
-                + "\n\nУведомлю **один раз**. Подписка сохранится после перезапуска.")
+                + "\n\nI will notify you **once**. The subscription will persist after a restart.")
                 .setColor(registration.alreadyOnline() ? 0x57F287 : 0xFEE75C)
-                .addField("🧾 Номер подписки", "`" + watch.id() + "`", false)
-                .setFooter("По никнейму • Смена ника может помешать обнаружению").build();
+                .addField("🧾 Subscription number", "`" + watch.id() + "`", false)
+                .setFooter("By nickname • Changing your nickname may hinder discovery").build();
     }
 
     public List<MessageEmbed> watchlist(List<WatchSubscription> watches) {
         List<String> lines = watches.stream().map(watch ->
                 (watch.status().equals("PENDING") ? "📨" : "🟡") + " **" + safe(watch.nickname()) + "**\n"
-                        + (watch.status().equals("PENDING") ? "Уведомление ожидает отправки" : "Ожидаем вход")
+                        + (watch.status().equals("PENDING") ? "Notification pending dispatch" : "Awaiting input")
                         + " · ID: `" + watch.id() + "`\n").toList();
         var pages = textPages("Мои подписки", "**" + watches.size() + "** в этом канале · Лимит **25** на игру\n"
-                        + "Для отмены используйте команду **unwatch** с номером подписки.",
-                lines, "В этом канале пока нет подписок.", "UTC");
+                        + "To cancel, use the **unwatch** command with the subscription number.",
+                lines, "There are no subscriptions in this channel yet.", "UTC");
         List<MessageEmbed> result = new ArrayList<>();
         for (int i = 0; i < pages.size(); i++) {
-            result.add(new EmbedBuilder(pages.get(i)).setFooter("Одноразовые подписки • Страница "
+            result.add(new EmbedBuilder(pages.get(i)).setFooter("One-time subscriptions • Page "
                     + (i + 1) + "/" + pages.size()).build());
         }
         return List.copyOf(result);
     }
 
     public MessageEmbed watchRemoved() {
-        return base("Слежение отключено", "🔕 Подписка отменена. Уже отправляемое сообщение ещё может прийти.")
+        return base("Tracking disabled", "🔕 Subscription cancelled. A message that is already being sent may still arrive.")
                 .setColor(0x95A5A6).build();
     }
 
     public MessageEmbed online(WatchNotification event) {
-        return base("Игрок онлайн", "🟢 **" + safe(event.nickname()) + "** замечен на сервере.\n\n"
-                        + "🕒 Обнаружен <t:" + event.observedAt().getEpochSecond() + ":R>\n"
-                        + "📍 Сервер **" + game + "**")
+        return base("Player online", "🟢 **" + safe(event.nickname()) + "** spotted on the server.\n\n"
+                        + "🕒 Detected <t:" + event.observedAt().getEpochSecond() + ":R>\n"
+                        + "📍 Server **" + game + "**")
                 .setColor(0x57F287).setTimestamp(event.observedAt())
-                .setFooter("Одноразовое уведомление • По никнейму • Время обнаружения, не точное время входа").build();
+                .setFooter("One-time notification • By nickname • Detection time, not exact login time").build();
     }
 
     public List<MessageEmbed> similarActivity(SimilarActivityReport report) {
         String description = "**" + safe(report.nickname()) + "** · " + report.days() + " дн.\n"
                 + period(report.periodStart(), report.periodEnd()) + "\n\n"
-                + "Пересечение по времени **не подтверждает** дружбу или общую команду.";
+                + "Temporal overlap **does not confirm** a friendship or a shared team.";
         List<EmbedBuilder> pages = new ArrayList<>();
-        pages.add(base("Похожая активность", description).setColor(0x9B59B6)
-                .addField("⏱️ Активность игрока", duration(report.totalSeconds()), true)
-                .addField("👥 Есть пересечения", String.valueOf(report.players().size()), true)
-                .addField("📊 Как считается сходство", "Совместное время ÷ время, когда хотя бы один был онлайн. "
-                        + "Это сходство расписания, а не вероятность игры в команде.", false));
+        pages.add(base("Similar activity", description).setColor(0x9B59B6)
+                .addField("⏱️ Player activity", duration(report.totalSeconds()), true)
+                .addField("👥 There are overlaps", String.valueOf(report.players().size()), true)
+                .addField("📊 How similarity is calculated", "Time spent together ÷ time when at least one person was online. "
+                        + "This refers to the similarity of the schedules, not the likelihood of playing for the team.", false));
         if (report.players().isEmpty()) {
-            pages.getFirst().addField("📭 Нет пересечений", "За выбранный период совпадений в логах не найдено.", false);
+            pages.getFirst().addField("📭 No intersections", "No matches were found in the logs for the selected period.", false);
         }
         for (int first = 0; first < report.players().size(); first += 4) {
-            var page = base("Похожая активность · рейтинг", description).setColor(0x9B59B6);
+            var page = base("Similar activity · rating", description).setColor(0x9B59B6);
             for (int i = first; i < Math.min(first + 4, report.players().size()); i++) {
                 var player = report.players().get(i);
                 int bars = Math.max(0, Math.min(10, (int) Math.round(player.similarityPercent() / 10)));
@@ -155,9 +155,9 @@ public class ReportFormatter {
                 if (name.length() > 240) name = name.substring(0, Character.isHighSurrogate(name.charAt(238)) ? 238 : 239) + "…";
                 page.addField(name, "`" + "▰".repeat(bars) + "▱".repeat(10 - bars) + "` **"
                         + percent(player.similarityPercent()) + "** сходства\n"
-                        + "⏱️ Вместе **" + duration(player.overlapSeconds()) + "** · 📅 Общих дней: **" + player.sharedDays() + "**\n"
-                        + "Совместно: **" + percent(player.targetOverlapPercent()) + "** времени цели / **"
-                        + percent(player.playerOverlapPercent()) + "** времени этого игрока", false);
+                        + "⏱️ Spent Together **" + duration(player.overlapSeconds()) + "** · 📅 Total days: **" + player.sharedDays() + "**\n"
+                        + "Jointly: **" + percent(player.targetOverlapPercent()) + "** of the target time / **"
+                        + percent(player.playerOverlapPercent()) + "** of this player's time", false);
             }
             pages.add(page);
         }
