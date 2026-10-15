@@ -7,6 +7,7 @@ services:
     env_file:
       - .env
     environment:
-      WATCHLIST_RECEIPTS_DIRECTORY: /app/logs
+      - WATCHLIST_RECEIPTS_DIRECTORY=/app/logs
+      - JAVA_TOOL_OPTIONS=-DsocksProxyHost=172.17.0.1 -DsocksProxyPort=1080
     volumes:
       - ./bot_logs:/app/logs
