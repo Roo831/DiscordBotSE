@@ -19,3 +19,7 @@ backend:
 
 watchlist:
   receipts-directory: ${WATCHLIST_RECEIPTS_DIRECTORY:./bot_logs}
+
+logging:
+  file:
+    name: ${APPLICATION_LOG_FILE:./bot_logs/discord-bot.log}

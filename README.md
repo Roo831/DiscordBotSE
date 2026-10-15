@@ -31,7 +31,7 @@ Tracking is by normalized nickname, not SteamID. Name changes/collisions and pla
 
 ### Similar activity
 
-`/rust_similar nickname:Roo days:7` opens a purple summary and paginated ranked cards. Each candidate shows shared time, distinct shared days, both players' fractions of time spent together, and a schedule similarity percentage: intersection time divided by union time (Jaccard). Every positive overlap is included, sorted by this score, overlap duration, then name.
+`/rust_similar nickname:Roo days:7` opens a purple summary and paginated ranked cards. Each candidate shows shared time, shared dates, both directional overlap percentages, shared recorded sessions, schedule overlap (Jaccard), and a separate ranking score. A shared session requires at least 15 minutes together within one target session; brief incidental encounters are filtered out. Score = Jaccard percentage × shared sessions. The backend sorts by score, Jaccard, overlap duration, then name; the bot preserves this order. The score is measured in points and may exceed 100, while the percentage remains schedule overlap, not a teammate probability. Equal join/exit timestamps are not used as team evidence because monitor restarts can generate them.
 
 This is **co-presence inferred from activity logs**, not proof of friendship or a Rust team. No Steam API lookup is performed: the existing logs do not provide trustworthy SteamIDs. Missing polling periods, unmatched connections and historical nickname changes can affect the result. Durations are calculated by the backend and formatted only in this bot.
 
@@ -55,27 +55,28 @@ On Linux/macOS use `sh ./gradlew`. Docker Compose reads these variables from `.e
 
 ### Docker deployment
 
-The Dockerfile builds and tests the current source with Java 21 inside the builder stage, then copies that JAR into the runtime image. A local `build/libs` JAR is neither required nor included. `.env` and local logs are excluded from the build context; Compose still supplies `.env` at runtime.
+The current Dockerfile packages a JAR from `build/libs`. Build a clean artifact first with `sh ./gradlew clean test bootJar` (or `gradlew.bat` on Windows); then build/publish the Docker image through the project's existing release process. Compose uses the published `roo831/discord-bot-se` image and does not compile checked-out source.
 
-After updating the backend to the JSON API, run these commands in the bot's repository (with a clean working tree on `main`):
+After deploying the paired backend and publishing the updated bot image:
 
 ```sh
-git pull --ff-only origin main
-docker compose build discord-bot
+docker compose pull discord-bot
 docker compose up -d --no-deps --force-recreate discord-bot
 docker compose logs --tail=100 discord-bot
 ```
 
-A restart alone does not rebuild the image. The build needs access to the Gradle distribution and Maven dependencies and fails if tests fail. Existing `.env` settings and `bot_logs` are preserved.
-
-If your installation uses `docker-compose`, use that spelling in the commands above. `docker-compose up -d --build discord-bot` also builds from source with this Dockerfile.
+Use `docker-compose` if that is the installed command. A restart or `up --build` does not publish a new remote image. Keep `.env`, `bot_logs`, and the existing proxy configuration.
 
 If reports contain literal JSON, formatting is absent, or `/rust_all_nicknames` logs `Content may not be longer than 2000 characters`, the running bot is using the older text renderer. Rebuild the image from the updated source and recreate its container. The JSON renderer sends coloured embeds and paginates player lists; it never sends the entire nickname response as plain text.
 
 The backend base URL is `http://${SERVER_IP}:${SERVER_PORT}/api/v1/analytics`; clients append `/rust` or `/engineers`. HTTP requests use a 5-second connection timeout and a 10-second read timeout. Commands are acknowledged before requesting data. Unavailable services produce a red error embed.
 
+## Operational logging
+
+Application and library logs use Log4j 2 (the Spring Boot starter replaces Logback). Output goes to the console and `APPLICATION_LOG_FILE`, defaulting to `./bot_logs/discord-bot.log`; Compose sets `/app/logs/discord-bot.log` in the existing mount. Receipts remain separate `.properties` files. Set `logging.level.*` to adjust verbosity. Bot tokens and API keys are not deliberately logged.
+
 ## Coordinated upgrade
 
-This version expects structured JSON, not the previous Markdown responses. Pause the bot, deploy the paired GameActivityMonitoringService change, then deploy/restart this bot. Slash command names and environment variable names remain the same.
+This version expects structured JSON, not the previous Markdown responses. Pause the bot, deploy the paired GameActivityMonitoringService change, then deploy/restart this bot. Slash command names remain the same. Deploy the backend first to enable the revised ranking and session evidence; the bot can still decode older reports without these optional fields.
 
 Tests exercise local HTTP JSON decoding, nickname URL encoding, embed limits, complete pagination, empty reports and navigation ownership. They do not log into Discord or query real game servers.
