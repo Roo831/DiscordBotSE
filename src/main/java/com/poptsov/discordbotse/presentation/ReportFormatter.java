@@ -133,17 +133,23 @@ public class ReportFormatter {
     }
 
     public List<MessageEmbed> similarActivity(SimilarActivityReport report) {
-        String description = "**" + safe(report.nickname()) + "** · " + report.days() + " дн.\n"
+        boolean hasSessionEvidence = report.players().stream()
+                .allMatch(player -> player.sharedSessions() != null && player.rankingScore() != null);
+        String description = "**" + safe(report.nickname()) + "** · " + report.days() + " days\n"
                 + period(report.periodStart(), report.periodEnd()) + "\n\n"
                 + "Temporal overlap **does not confirm** a friendship or a shared team.";
         List<EmbedBuilder> pages = new ArrayList<>();
         pages.add(base("Similar activity", description).setColor(0x9B59B6)
                 .addField("⏱️ Player activity", duration(report.totalSeconds()), true)
-                .addField("👥 There are overlaps", String.valueOf(report.players().size()), true)
-                .addField("📊 How similarity is calculated", "Time spent together ÷ time when at least one person was online. "
-                        + "This refers to the similarity of the schedules, not the likelihood of playing for the team.", false));
+                .addField("👥 Candidates", String.valueOf(report.players().size()), true)
+                .addField("📊 How candidates are ranked", hasSessionEvidence
+                        ? "Score = schedule overlap × shared recorded sessions. "
+                        + "A shared session requires at least 15 minutes together during one of the target's sessions."
+                        : "Players are ordered by schedule overlap. Shared-session counts are unavailable for this report.", false)
+                .addField("📐 Schedule overlap", "Shared time ÷ time when at least one player was online. "
+                        + "This percentage is not a probability of being teammates.", false));
         if (report.players().isEmpty()) {
-            pages.getFirst().addField("📭 No intersections", "No matches were found in the logs for the selected period.", false);
+            pages.getFirst().addField("📭 No candidates", "No shared sessions of at least 15 minutes were recorded in this period.", false);
         }
         for (int first = 0; first < report.players().size(); first += 4) {
             var page = base("Similar activity · rating", description).setColor(0x9B59B6);
@@ -154,8 +160,11 @@ public class ReportFormatter {
                 String name = medal + " " + (i + 1) + ". " + safe(player.nickname());
                 if (name.length() > 240) name = name.substring(0, Character.isHighSurrogate(name.charAt(238)) ? 238 : 239) + "…";
                 page.addField(name, "`" + "▰".repeat(bars) + "▱".repeat(10 - bars) + "` **"
-                        + percent(player.similarityPercent()) + "** similarities\n"
+                        + percent(player.similarityPercent()) + "** schedule overlap\n"
                         + "⏱️ Spent Together **" + duration(player.overlapSeconds()) + "** · 📅 Total days: **" + player.sharedDays() + "**\n"
+                        + (player.sharedSessions() == null || player.rankingScore() == null ? ""
+                        : "🤝 Shared sessions **" + player.sharedSessions() + "** · 🏅 Score **"
+                        + String.format(Locale.ROOT, "%.1f", player.rankingScore()) + "**\n")
                         + "Jointly: **" + percent(player.targetOverlapPercent()) + "** of the target time / **"
                         + percent(player.playerOverlapPercent()) + "** of this player's time", false);
             }

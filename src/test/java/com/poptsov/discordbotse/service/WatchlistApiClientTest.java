@@ -38,7 +38,8 @@ class WatchlistApiClientTest {
             if (path.endsWith("/similar")) json = """
                     {"nickname":"Roo","days":7,"periodStart":"2026-10-05T10:00:00","periodEnd":"2026-10-12T10:00:00",
                     "timeZone":"UTC","totalSeconds":7200,"players":[{"nickname":"Шкет","totalSeconds":7200,
-                    "overlapSeconds":3600,"sharedDays":1,"targetOverlapPercent":50.0,"playerOverlapPercent":50.0,"similarityPercent":33.3333}]}
+                    "overlapSeconds":3600,"sharedDays":1,"targetOverlapPercent":50.0,"playerOverlapPercent":50.0,
+                    "similarityPercent":33.3333,"sharedSessions":3,"rankingScore":99.9999}]}
                     """;
             else if (path.endsWith("/pending")) json = """
                     [{"eventId":"event-1","subscriptionId":"watch-1","nickname":"Roo","userId":"42",
@@ -49,6 +50,9 @@ class WatchlistApiClientTest {
                 exchange.close();
                 return;
             } else json = method.equals("POST") ? "{\"subscription\":" + watch + ",\"alreadyOnline\":false}" : "[" + watch + "]";
+            if (path.endsWith("/similar") && "Legacy".equals(parameters.get("nickname"))) {
+                json = json.replace(",\"sharedSessions\":3,\"rankingScore\":99.9999", "");
+            }
             byte[] body = json.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, body.length);
@@ -72,6 +76,8 @@ class WatchlistApiClientTest {
             var similar = backend.getSimilarActivity("Roo + & Шкет", 7);
             assertEquals(3600, similar.players().getFirst().overlapSeconds());
             assertEquals(33.3333, similar.players().getFirst().similarityPercent(), 0.00001);
+            assertEquals(3, similar.players().getFirst().sharedSessions());
+            assertEquals(99.9999, similar.players().getFirst().rankingScore(), 0.00001);
             backend.unwatch("watch-1", "42", "100");
             backend.acknowledgeNotification("event-1");
             assertTrue(calls.contains("DELETE /api/v1/analytics/rust/watchlist/watch-1"));
@@ -79,6 +85,9 @@ class WatchlistApiClientTest {
             assertEquals("42", parameters.get("userId"));
             assertEquals("100", parameters.get("channelId"));
             assertEquals("test-key", parameters.get("apiKey"));
+            var legacy = backend.getSimilarActivity("Legacy", 7).players().getFirst();
+            assertNull(legacy.sharedSessions());
+            assertNull(legacy.rankingScore());
         } finally {
             server.stop(0);
         }

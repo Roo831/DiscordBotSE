@@ -22,6 +22,8 @@ import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -29,6 +31,7 @@ import java.util.*;
 import java.util.concurrent.Executors;
 
 public class DiscordBot extends ListenerAdapter {
+    private static final Logger log = LogManager.getLogger(DiscordBot.class);
     private final String botToken;
     private final String serverName;
     private final String prefixSlashCommand;
@@ -55,7 +58,7 @@ public class DiscordBot extends ListenerAdapter {
     @PostConstruct
     public void startBot() throws Exception {
         if (botToken == null || botToken.isBlank() || botToken.equals("NOT_SET")) {
-            System.err.println("[" + serverName + "]: Bot token is not configured.");
+            log.info("[{}] Bot token is not configured; bot is disabled", serverName);
             return;
         }
         jda = JDABuilder.createDefault(botToken.trim()).addEventListeners(this)
@@ -77,7 +80,7 @@ public class DiscordBot extends ListenerAdapter {
                         .addOption(OptionType.STRING, "subscription_id", "Subscription number from watchlist", true),
                 Commands.slash(prefixSlashCommand + "_similar", "👥 Find players with similar activity")
                         .addOptions(nicknameOption(), daysOption("Period in days (default: 7)"))
-        ).queue(null, error -> System.err.println("[" + serverName + "]: Command registration failed: " + error.getMessage()));
+        ).queue(null, error -> log.error("[{}] Command registration failed", serverName, error));
     }
 
     @Override
@@ -89,7 +92,7 @@ public class DiscordBot extends ListenerAdapter {
             if (watchCommand) event.deferReply(true).complete();
             else event.deferReply().complete();
         } catch (Exception error) {
-            System.err.println("[" + serverName + "]: Could not acknowledge command: " + error.getMessage());
+            log.warn("[{}] Could not acknowledge command", serverName, error);
             return;
         }
         try {
@@ -126,7 +129,7 @@ public class DiscordBot extends ListenerAdapter {
             if (pages.size() > 1) reply.setActionRow(buttons(id, 0, pages.size()));
             else if (registration != null) reply.setActionRow(Button.danger(
                     prefixSlashCommand + ":unwatch:" + registration.subscription().id(), "🔕 Stop tracking"));
-            reply.queue(null, error -> System.err.println("[" + serverName + "]: Could not send report: " + error.getMessage()));
+            reply.queue(null, error -> log.warn("[{}] Could not send report", serverName, error));
         } catch (IllegalArgumentException error) {
             event.getHook().editOriginalEmbeds(formatter.error(error.getMessage())).queue();
         } catch (RestClientResponseException error) {
@@ -139,10 +142,10 @@ public class DiscordBot extends ListenerAdapter {
             }
             event.getHook().editOriginalEmbeds(formatter.error(message)).setAllowedMentions(Collections.emptyList()).queue();
         } catch (RestClientException error) {
-            System.err.println("[" + serverName + "]: Analytics request failed: " + error.getMessage());
+            log.warn("[{}] Analytics request failed", serverName, error);
             event.getHook().editOriginalEmbeds(formatter.error("The analytics service is unavailable. Please try again later.")).queue();
         } catch (Exception error) {
-            System.err.println("[" + serverName + "]: Report failed: " + error.getMessage());
+            log.error("[{}] Report failed", serverName, error);
             event.getHook().editOriginalEmbeds(formatter.error("The report could not be prepared. Please try again later.")).queue();
         }
     }
